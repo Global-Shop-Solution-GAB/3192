@@ -1,0 +1,466 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Function.Intrinsic.Debug.SetScriptVersion("1.0.143","True")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+' Activate using hook 11300
+'Function.Intrinsic.Debug.ShowCallerInfo
+
+Variable.Local.sRHSelect.Declare(String)
+Variable.Local.sRLSelect.Declare(String)
+Variable.Local.sSeq.Declare(String)
+Variable.Local.sSEQSelect.Declare(String)
+Variable.Local.sRouterAuditSelect.Declare(String)
+Variable.Local.sRouterChgSelect.Declare(String)
+Variable.Local.sMaxSelect.Declare(String)
+Variable.Local.LID.Declare(Long)
+Variable.Local.sUser.Declare(String)
+Variable.Local.dDateROrig.Declare(Date)
+Variable.Local.sDay.Declare(String)
+Variable.Local.sMonth.Declare(String)
+Variable.Local.sYear.Declare(String)
+Variable.Local.dDateToday.Declare(String)
+Variable.Local.sChgFlag.Declare(String)
+Variable.Local.fCrewSz.Declare(Float)
+Variable.Local.fSetup.Declare(Float)
+Variable.Local.fRuntime.Declare(Float)
+Variable.Local.fRate.Declare(Float)
+Variable.Local.fProjSeq.Declare(Float)
+Variable.Local.fAmtMin.Declare(Float)
+Variable.Local.fGrpSeq.Declare(Float)
+
+Function.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+Variable.Local.sSeq.Set(Variable.Passed.000111)
+Function.Intrinsic.String.LPad(V.Local.sSeq,0,6,V.Local.sSeq)
+
+'Convert date format to database format YYYY-MM-DD
+V.Local.dDateToday.Set(V.Ambient.Date)
+V.Local.dDateToday.Set(V.Local.dDateToday.PervasiveDate)
+
+'Check new router created - DATE_ORIGINAL on ROUTER_HEADER and no Line record in ROUTER_LINE
+Function.Intrinsic.String.Concat("SELECT * FROM ROUTER_HEADER WHERE ROUTER = '",Variable.Passed.008000,"' AND ROUTER_TYPE = 'H'",V.Local.sRHSelect)
+Function.Intrinsic.String.Concat("SELECT * FROM ROUTER_LINE WHERE ROUTER = '",Variable.Passed.008000,"' AND ROUTER_TYPE = 'L'",V.Local.sRLSelect)
+Function.Intrinsic.String.Concat("SELECT * FROM ATG_3192_ROUTER_AUDIT WHERE ROUTER = '",Variable.Passed.008000,"' and GS_USER = '",Variable.Caller.User,"' AND SIGNOFF_DATE = '",V.Local.dDateToday,"'",V.Local.sRouterAuditSelect)
+Function.Intrinsic.String.Concat("SELECT MAX(ID) FROM ATG_3192_ROUTER_AUDIT","",V.Local.sMaxSelect)
+Function.Intrinsic.String.Concat("SELECT * FROM ROUTER_LINE WHERE ROUTER = '",Variable.Passed.008000,"' AND LINE_ROUTER = '",V.Local.sSeq,"'",V.Local.sSEQSelect)
+Function.ODBC.Connection!conx.OpenRecordsetRO("rstMaxID",V.Local.sMaxSelect)
+Function.ODBC.Connection!conx.OpenRecordsetRO("rstSelect",V.Local.sSEQSelect)
+Function.ODBC.Connection!conx.OpenRecordsetRO("rstRHSel",V.Local.sRHSelect)
+Function.ODBC.Connection!conx.OpenRecordsetRO("rstRLSel",V.Local.sRLSelect)
+Function.ODBC.Connection!conx.OpenRecordsetRW("rstRAuditW",V.Local.sRouterAuditSelect)
+
+'Function.Intrinsic.String.Concat("Runtime = ",V.ODBC.conx!rstSelect.FieldValString!RUN_TIME," , Setup = ",V.ODBC.conx!rstSelect.FieldValString!SET_UP,V.Local.sRuntime)
+'Function.Intrinsic.UI.Msgbox(V.Local.sRuntime,"Test")
+
+'Variable.Local.dDateToday.Set(Variable.Ambient.Date)
+Function.Intrinsic.Date.ConvertDString(V.ODBC.conx!rstRHSel.FieldValString!DATE_ORIGINAL,"MM/DD/YY",V.Local.dDateROrig)
+
+Function.Intrinsic.Control.If(V.ODBC.conx!rstRAuditW.EOF,"=",True)
+	Variable.Local.LID.Set(V.ODBC.conx!rstMaxID.FieldValLong!EXPR_1)
+	Function.Intrinsic.Math.Add(V.Local.LID,1,V.Local.LID)
+Function.Intrinsic.Control.Else
+	V.Local.LID.Set(V.ODBC.conx!rstRAuditW.FieldValLong!ID)
+Function.Intrinsic.Control.EndIf
+
+Function.Intrinsic.String.Concat("SELECT * FROM ATG_3192_ROUTER_CHANGES WHERE ID = '",V.Local.LID,"'",V.Local.sRouterChgSelect)
+Function.ODBC.Connection!conx.OpenRecordsetRW("rstRChgW",V.Local.sRouterChgSelect)
+
+Function.Intrinsic.Control.If(V.ODBC.conx!rstRHSel.EOF,"=",False)
+	Function.Intrinsic.Control.If(V.ODBC.conx!rstRLSel.EOF,"=",True)
+		Function.Intrinsic.Control.If(V.ODBC.conx!rstRAuditW.EOF,"=",True)
+			Function.ODBC.conx!rstRAuditW.AddNew
+			Function.ODBC.conx!rstRAuditW.Set!ID(V.Local.LID)
+			Function.ODBC.conx!rstRAuditW.Set!ROUTER(V.Passed.008000)
+			Function.ODBC.conx!rstRAuditW.Set!GS_USER(V.Caller.User)
+			Function.ODBC.conx!rstRAuditW.Set!USER_TERMINAL(Variable.Caller.Terminal)
+			Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_TIME(Variable.Ambient.Time)
+			Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_DATE(V.Ambient.Date)
+			Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_FLAG("N")
+			Function.ODBC.conx!rstRAuditW.Set!COMMENT("New Router")
+			Function.ODBC.conx!rstRAuditW.Update
+		Function.Intrinsic.Control.Else
+			Function.ODBC.conx!rstRAuditW.Set!GS_USER(V.Caller.User)
+			Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_DATE(V.Ambient.Date)
+			Function.ODBC.conx!rstRAuditW.Set!USER_TERMINAL(Variable.Caller.Terminal)
+			Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_TIME(Variable.Ambient.Time)
+			Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_FLAG("N")
+			Function.ODBC.conx!rstRAuditW.Set!COMMENT("Router Recreated")
+			Function.ODBC.conx!rstRAuditW.Update
+		Function.Intrinsic.Control.EndIf
+		
+		Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+			Function.ODBC.conx!rstRChgW.AddNew
+			Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+			Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("ROUTER_LINE")
+			Function.ODBC.conx!rstRChgW.Set!AFTER(V.Local.sSeq)
+			Function.ODBC.conx!rstRChgW.Update
+		Function.Intrinsic.Control.EndIf
+		
+	Function.Intrinsic.Control.Else
+		'New Sequence Inserted
+		Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.EOF,"=",True)
+			'Function.Intrinsic.Control.If(V.Local.dDateROrig,"<>",V.Ambient.Date)
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.ODBC.conx!rstRChgW.AddNew
+				Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+				Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("ROUTER_LINE")
+				Function.ODBC.conx!rstRChgW.Set!AFTER(V.Local.sSeq)
+			Function.Intrinsic.Control.Else
+				Variable.Local.sChgFlag.Set("Y")
+				Function.ODBC.conx!rstRChgW.AddNew
+				Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+				Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("ROUTER_LINE")
+				Function.ODBC.conx!rstRChgW.Set!AFTER(V.Local.sSeq)
+			Function.Intrinsic.Control.EndIf
+			Function.ODBC.conx!rstRChgW.Update
+			
+			'Function.Intrinsic.Control.EndIf
+		Function.Intrinsic.Control.Else
+			'Check for existing sequence changes
+			Variable.Local.sPartWC.Declare(String)
+			Function.Intrinsic.String.Concat("'",V.ODBC.conx!rstSelect.FieldValTrim!CREW_SIZE,"'   Vs   ","'",V.Local.fCrewSz,"'",V.Local.sPartWC)
+			'F.Intrinsic.UI.Msgbox(V.Local.sPartWC,"Stuff")
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValTrim!PART_WC_OUTSIDE,"<>",V.Passed.000112)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("PART_WC_OUTSIDE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!PART_WC_OUTSIDE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000112)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("PART_WC_OUTSIDE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!PART_WC_OUTSIDE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000112)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValTrim!OPERATION,"<>",V.Passed.000114)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("OPERATION")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!OPERATION)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000114)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("OPERATION")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!OPERATION)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000114)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Math.ConvertToFloat(V.Passed.000116,V.Local.fSetup)
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValFloat!SET_UP,"<>",V.Local.fSetup)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("SET_UP")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValFloat!SET_UP)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000116)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("SET_UP")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValString!SET_UP)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000116)
+				Function.Intrinsic.Control.Endif
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Math.ConvertToFloat(V.Passed.000118,V.Local.fRuntime)
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValFloat!RUN_TIME,"<>",V.Local.fRuntime)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("RUN_TIME")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValFloat!RUN_TIME)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000118)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("RUN_TIME")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValString!RUN_TIME)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000118)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Math.ConvertToFloat(V.Passed.000120,V.Local.fRate)
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValFloat!RATE,"<>",V.Local.fRate)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("RATE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValFloat!RATE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000120)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("RATE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValFloat!RATE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000120)
+				Function.intrinsic.control.endif
+			Function.intrinsic.control.endif
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValString!FREQUENCY,"<>",V.Passed.000145)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("FREQUENCY")
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValString!FREQUENCY)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000145)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("FREQUENCY")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValString!FREQUENCY)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000145)
+				Function.intrinsic.control.endif
+			Function.intrinsic.control.endif
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValTrim!DESC_RT_LINE,"<>",V.Passed.000121)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("DESC_RT_LINE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!DESC_RT_LINE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000121)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("DESC_RT_LINE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!DESC_RT_LINE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000121)
+				Function.intrinsic.control.endif
+			Function.intrinsic.control.endif
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValTrim!UM_INVENTORY,"<>",V.Passed.000119)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("UM_INVENTORY")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!UM_INVENTORY)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000119)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("UM_INVENTORY")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!UM_INVENTORY)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000119)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValTrim!OVERLAP,"<>",V.Passed.000141)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("OVERLAP")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!OVERLAP)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000141)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("OVERLAP")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!OVERLAP)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000141)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValTrim!WC_FACTOR,"<>",V.Passed.000142)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("WC_FACTOR")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!WC_FACTOR)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000142)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("WC_FACTOR")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!WC_FACTOR)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000142)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Math.ConvertToFloat(V.Passed.000152,V.Local.fAmtMin)
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValFloat!AMT_MINIMUM,"<>",V.Local.fAmtMin)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("AMT_MINIMUM")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValFloat!AMT_MINIMUM)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000152)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("AMT_MINIMUM")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValFloat!AMT_MINIMUM)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000152)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Math.ConvertToFloat(V.Passed.000146,V.Local.fGrpSeq)
+			Variable.Local.fGrpSeqDB.Declare(Float)
+			Function.Intrinsic.Math.ConvertToFloat(V.ODBC.conx!rstSelect.FieldValTrim!GROUP_SEQUENCE,V.Local.fGrpSeqDB)
+			Function.Intrinsic.Control.If(V.Local.fGrpSeqDB,"<>",V.Local.fGrpSeq)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("GROUP_SEQUENCE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!GROUP_SEQUENCE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000146)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("GROUP_SEQUENCE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValFloat!GROUP_SEQUENCE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000146)
+				Function.intrinsic.control.endif
+			Function.intrinsic.control.endif
+			Function.Intrinsic.Math.ConvertToFloat(V.Passed.000139,V.Local.fCrewSz)
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValFloat!CREW_SIZE,"<>",V.Local.fCrewSz)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("CREW_SIZE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValFloat!CREW_SIZE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000139)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("CREW_SIZE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValFloat!CREW_SIZE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000139)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValTrim!LEAD_TIME,"<>",V.Passed.000153)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("LEAD_TIME")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!LEAD_TIME)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000153)
+				F.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("LEAD_TIME")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!LEAD_TIME)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000153)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValTrim!SORT_CODE,"<>",V.Passed.000129)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("SORT_CODE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!SORT_CODE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000129)
+				F.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("SORT_CODE")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!SORT_CODE)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000129)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstSelect.FieldValTrim!PROJ_GROUP,"<>",V.Passed.000127)
+				Variable.Local.sChgFlag.Set("Y")
+				Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("PROJ_GROUP")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!PROJ_GROUP)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000127)
+				Function.Intrinsic.Control.Else
+					Function.ODBC.conx!rstRChgW.AddNew
+					Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+					Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("PROJ_GROUP")
+					Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+					Function.ODBC.conx!rstRChgW.Set!BEFORE(V.ODBC.conx!rstSelect.FieldValTrim!PROJ_GROUP)
+					Function.ODBC.conx!rstRChgW.Set!AFTER(V.Passed.000127)
+				Function.Intrinsic.Control.EndIf
+			Function.Intrinsic.Control.EndIf
+		
+			'Function.ODBC.conx!rstRChgW.Update
+
+		Function.Intrinsic.Control.EndIf
+
+		Function.Intrinsic.Control.If(V.Local.sChgFlag,"=","Y")
+			Function.ODBC.conx!rstRChgW.Update
+			Function.Intrinsic.Control.If(V.ODBC.conx!rstRAuditW.EOF,"=",True)
+				Function.ODBC.conx!rstRAuditW.AddNew
+				Function.ODBC.conx!rstRAuditW.Set!ID(V.Local.LID)
+				Function.ODBC.conx!rstRAuditW.Set!ROUTER(V.Passed.008000)
+				Function.ODBC.conx!rstRAuditW.Set!GS_USER(V.Caller.User)
+				Function.ODBC.conx!rstRAuditW.Set!USER_TERMINAL(Variable.Caller.Terminal)
+				Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_TIME(Variable.Ambient.Time)
+				Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_DATE(V.Ambient.Date)
+				Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_FLAG("N")
+				Function.ODBC.conx!rstRAuditW.Set!COMMENT("Router Changed")
+				Function.ODBC.conx!rstRAuditW.Update
+			Function.Intrinsic.Control.Else
+				Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_FLAG("N")
+				Function.ODBC.conx!rstRAuditW.Update
+			Function.Intrinsic.Control.EndIf
+		Function.Intrinsic.Control.EndIf
+
+	Function.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndIf
+
+
+Function.ODBC.conx!rstMaxID.Close
+Function.ODBC.conx!rstSelect.Close
+Function.ODBC.conx!rstRHSel.Close
+Function.ODBC.conx!rstRLSel.Close
+Function.ODBC.conx!rstRAuditW.Close
+Function.ODBC.conx!rstRChgW.Close
+
+
+Function.Intrinsic.Control.End
+
+
+
+
+Program.Sub.Main.End
+
+
