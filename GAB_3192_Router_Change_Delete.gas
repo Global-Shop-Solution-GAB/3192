@@ -1,0 +1,95 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Activate using hook number 11310
+'Deleted Router Sequence Audit
+
+Variable.Local.sDay.Declare(String)
+Variable.Local.sMonth.Declare(String)
+Variable.Local.sYear.Declare(String)
+Variable.Local.dDateToday.Declare(String)
+Variable.Local.sChgFlag.Declare(String)
+Variable.Local.sSeq.Declare(String)
+Variable.Local.sMaxSelect.Declare(String)
+Variable.Local.LID.Declare(Long)
+Variable.Local.sRouterAuditSelect.Declare(String)
+Variable.Local.sRouterChgSelect.Declare(String)
+
+
+Function.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+Variable.Local.sSeq.Set(Variable.Passed.000111)
+Function.Intrinsic.String.LPad(V.Local.sSeq,0,6,V.Local.sSeq)
+
+'Convert date format to database format YYYY-MM-DD
+Function.Intrinsic.Date.Day(V.Ambient.Date,V.Local.sDay)
+Function.Intrinsic.String.LPad(V.Local.sDay,"0",2,V.Local.sDay)
+Function.Intrinsic.Date.Month(V.Ambient.Date,V.Local.sMonth)
+Function.Intrinsic.String.LPad(V.Local.sMonth,"0",2,V.Local.sMonth)
+Function.Intrinsic.Date.Year(V.Ambient.Date,V.Local.sYear)
+Function.Intrinsic.string.Concat(V.Local.sYear,"-",V.Local.sMonth,"-",V.Local.sDay,V.Local.dDateToday)
+
+Function.Intrinsic.String.Concat("SELECT MAX(ID) FROM ATG_3192_ROUTER_AUDIT","",V.Local.sMaxSelect)
+Function.Intrinsic.String.Concat("SELECT * FROM ATG_3192_ROUTER_AUDIT WHERE ROUTER = '",Variable.Passed.008000,"' and GS_USER = '",Variable.Caller.User,"' AND SIGNOFF_DATE = '",V.Local.dDateToday,"'",V.Local.sRouterAuditSelect)
+Function.Intrinsic.String.Concat("SELECT * FROM ATG_3192_ROUTER_CHANGES WHERE ID = '",V.Local.LID,"' AND BEFORE = '",V.Local.sSeq,"'",V.Local.sRouterChgSelect)
+Function.ODBC.Connection!conx.OpenRecordsetRO("rstMaxID",V.Local.sMaxSelect)
+Function.ODBC.Connection!conx.OpenRecordsetRW("rstRAuditW",V.Local.sRouterAuditSelect)
+Function.ODBC.Connection!conx.OpenRecordsetRW("rstRChgW",V.Local.sRouterChgSelect)
+
+Function.Intrinsic.Control.If(V.ODBC.conx!rstRAuditW.EOF,"=",True)
+	Variable.Local.LID.Set(V.ODBC.conx!rstMaxID.FieldValLong!EXPR_1)
+	Function.Intrinsic.Math.Add(V.Local.LID,1,V.Local.LID)
+	Function.ODBC.conx!rstRAuditW.AddNew
+	Function.ODBC.conx!rstRAuditW.Set!ID(V.Local.LID)
+	Function.ODBC.conx!rstRAuditW.Set!ROUTER(V.Passed.008000)
+	Function.ODBC.conx!rstRAuditW.Set!GS_USER(V.Caller.User)
+	Function.ODBC.conx!rstRAuditW.Set!USER_TERMINAL(V.Caller.Terminal)
+	Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_DATE(V.Ambient.Date)
+	Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_FLAG("N")
+	Function.ODBC.conx!rstRAuditW.Set!COMMENT("SEQ Delete")
+	Function.ODBC.conx!rstRAuditW.Update
+	Function.ODBC.conx!rstRAuditW.Close
+Function.Intrinsic.Control.Else
+	V.Local.LID.Set(V.ODBC.conx!rstRAuditW.FieldValLong!ID)
+	Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_FLAG("N")
+	Function.ODBC.conx!rstRAuditW.Set!SIGNOFF_DATE(V.Ambient.Date)
+	Function.ODBC.conx!rstRAuditW.Update
+	Function.ODBC.conx!rstRAuditW.Close
+Function.Intrinsic.Control.EndIf
+
+Function.Intrinsic.Control.If(V.ODBC.conx!rstRChgW.EOF,"=",True)
+	Function.ODBC.conx!rstRChgW.AddNew
+	Function.ODBC.conx!rstRChgW.Set!ID(V.Local.LID)
+	Function.ODBC.conx!rstRChgW.Set!FIELD_NAME("ROUTER_LINE")
+	Function.ODBC.conx!rstRChgW.Set!SEQUENCE(V.Local.sSeq)
+	Function.ODBC.conx!rstRChgW.Set!BEFORE(V.Local.sSeq)
+	Function.ODBC.conx!rstRChgW.Set!AFTER("Deleted")
+	Function.ODBC.conx!rstRChgW.Update
+	Function.ODBC.conx!rstRChgW.Close
+Function.Intrinsic.Control.Else
+	Function.ODBC.conx!rstRChgW.Close
+Function.Intrinsic.Control.endif
+
+Function.ODBC.conx!rstMaxID.Close
+Function.ODBC.Connection!conx.Close
+Function.Intrinsic.Control.End
+	
+		
+			
+
+
+
+
+
+
+
+
+
+
+Program.Sub.Main.End
+
+
